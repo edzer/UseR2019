@@ -1,0 +1,18 @@
+---
+title: "UseR! 2019 Spatial workshop part I"
+author: "Edzer Pebesma"
+date: "6/18/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Organisation (75 minutes)
+
+* intro; intro sf (20 mins)
+* raster data, array data (10 mins)
+* temporal, spatiotemporal data (10 mins)
+* data cubes; stars (20 mins)
+* ...
