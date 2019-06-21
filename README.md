@@ -21,7 +21,7 @@ Workshop program:
 * 14:00-15:15: Introduction, spatial, spatio-temporal data, data cubes (Edzer); [slides](https://edzer.github.io/UseR2019/part1.html)
 * 15:15-16:00: Exercises (and break) with help from Angela, Edzer, Roger (break: 15:30-16:00)
 * 16:00-16:15: Recap of the exercises
-* 16:15-17:30: Spatial modelling, spatial weights, disease modelling (Roger)
+* 16:15-17:30: Spatial modelling, spatial weights, disease modelling (Roger);
 [slides](https://edzer.github.io/UseR2019/part2.html)
 
 Potentially useful materials for preparing:
