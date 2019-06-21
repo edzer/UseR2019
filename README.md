@@ -29,7 +29,8 @@ Potentially useful materials for preparing:
 * Geostat summer school workshop "New R packages for spatial and spatiotemporal vector and raster data": [video](https://www.youtube.com/watch?v=yhpkx_xO-LE&list=PLXUoTpMa_9s3T-K7m8LO3Mf29g9E4EJLs)
 * Spatial Data Science with R: [book](https://r-spatial.org/book)
 * rstudio::conf presentations _Tidy spatial data analysis_ (2018; [slides](https://edzer.github.io/rstudio_conf/index.html#1), [video](https://www.rstudio.com/resources/videos/tidy-spatial-data-analysis/)), _Spatial data science in the Tidyverse_ (2019; [slides](https://edzer.github.io/rstudio_conf/2019/#1), [video](https://resources.rstudio.com/rstudio-conf-2019/spatial-data-science-in-the-tidyverse))
-
+* [Bergen ML slides](https://github.com/bergen-ml/2019-02-19-bivand)
+* [Paris workshop slides](https://github.com/rsbivand/sew19)
 
 Datasets that will be used:
 
