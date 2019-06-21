@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 * Spatial modelling: why and which kinds; is spatial autocorrelation just poor data collection design and/or model mis-specification? (15)
 * Spatial modelling: graph/weight-based neighbours; distance; spatially structured random effects (15)
+* QA/discussion
 * Spatial regression: simultaneous and conditional autoregressive approaches (15)
 * Spatio-temporal regression: spatial panel (15)
-
+* QA/discussion
