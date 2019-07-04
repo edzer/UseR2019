@@ -32,12 +32,12 @@ and spDataLarge - `install.packages("spDataLarge", repos = "https://nowosad.gith
 
 ### Script
 
-Script at (https://raw.githubusercontent.com/edzer/UseR2019/master/part2.R).
+Script at https://raw.githubusercontent.com/edzer/UseR2019/master/part2.R. Dowload to suitable location and use as basis.
 
 
 ## Is spatial autocorrelation just poor data collection design and/or model mis-specification?
 
-- Spatial, time series, and spatio-temporal data breaks the fundamental rule of independence of observations (social networks do too)
+- Spatial, time series, and spatio-temporal data break the fundamental rule of independence of observations (social networks do too)
 
 - Often, we are not sampling from a known population to get observations, so caution is needed for inference
 
@@ -67,7 +67,7 @@ Script at (https://raw.githubusercontent.com/edzer/UseR2019/master/part2.R).
 
 - But maybe what we see as clustering, patchiness, pattern, that looks spatial is actually mis-specification, such as a missing covariate, and/or inappropriate functional form, and/or including variables acting at different scales, and/or consequences of suboptimal bounding of tesselated observations ...
 
-- Here, we'll first look at the consequences of treating inhomogeneous point as homogeneous (the intensity trends upwards with `x`)
+- Here, we'll first look at the consequences of treating inhomogeneous points as homogeneous (the intensity trends upwards with `x`)
 
 - Then we'll use those points to see what happens in adding a similar trend to a random variable; empirical variograms are constructed ignoring and including the trend, and tests for global and local spatial autocorrelation are calculated
 

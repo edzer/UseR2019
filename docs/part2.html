@@ -419,12 +419,12 @@ $(document).ready(function () {
 </div>
 <div id="script" class="section level3">
 <h3>Script</h3>
-<p>Script at (<a href="https://raw.githubusercontent.com/edzer/UseR2019/master/part2.R" class="uri">https://raw.githubusercontent.com/edzer/UseR2019/master/part2.R</a>).</p>
+<p>Script at <a href="https://raw.githubusercontent.com/edzer/UseR2019/master/part2.R" class="uri">https://raw.githubusercontent.com/edzer/UseR2019/master/part2.R</a>. Dowload to suitable location and use as basis.</p>
 </div>
 <div id="is-spatial-autocorrelation-just-poor-data-collection-design-andor-model-mis-specification" class="section level2">
 <h2>Is spatial autocorrelation just poor data collection design and/or model mis-specification?</h2>
 <ul>
-<li><p>Spatial, time series, and spatio-temporal data breaks the fundamental rule of independence of observations (social networks do too)</p></li>
+<li><p>Spatial, time series, and spatio-temporal data break the fundamental rule of independence of observations (social networks do too)</p></li>
 <li><p>Often, we are not sampling from a known population to get observations, so caution is needed for inference</p></li>
 <li><p>Often again, the observation units or entities are not chosen by us, but by others</p></li>
 <li><p>Designing spatial samples has become a less important part of the field than previously <span class="citation">(Ripley 1981; Müller 2007)</span></p></li>
@@ -450,7 +450,7 @@ $(document).ready(function () {
 <ul>
 <li><p>Sometimes when we use spatial data, we jump to spatial statistical methods because of the widely cited first law of geography, that nearby observations are more likely to be similar than those further away</p></li>
 <li><p>But maybe what we see as clustering, patchiness, pattern, that looks spatial is actually mis-specification, such as a missing covariate, and/or inappropriate functional form, and/or including variables acting at different scales, and/or consequences of suboptimal bounding of tesselated observations …</p></li>
-<li><p>Here, we’ll first look at the consequences of treating inhomogeneous point as homogeneous (the intensity trends upwards with <code>x</code>)</p></li>
+<li><p>Here, we’ll first look at the consequences of treating inhomogeneous points as homogeneous (the intensity trends upwards with <code>x</code>)</p></li>
 <li><p>Then we’ll use those points to see what happens in adding a similar trend to a random variable; empirical variograms are constructed ignoring and including the trend, and tests for global and local spatial autocorrelation are calculated</p></li>
 </ul>
 </div>
@@ -740,7 +740,7 @@ head(pol_pres15[, c(1, 4, 6)])</code></pre>
 <pre class="r"><code>suppressPackageStartupMessages(library(spdep))
 system.time(nb_q &lt;- poly2nb(pol_pres15, queen=TRUE))</code></pre>
 <pre><code>##    user  system elapsed 
-##   1.677   0.009   1.693</code></pre>
+##   1.520   0.016   1.542</code></pre>
 <p>The object returned is very sparse; the print method reports asymmetric objects and objects with observations with no neighbours.</p>
 <pre class="r"><code>nb_q</code></pre>
 <pre><code>## Neighbour list object:
@@ -765,7 +765,7 @@ plot(nb_q, coords=st_coordinates(coords), add=TRUE, points=FALSE, lwd=0.5)</code
   nb_sf_q1 &lt;- poly2nb(pol_pres15, queen=TRUE, foundInBox=fB1a)
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##   0.965   0.020   0.989</code></pre>
+##   0.962   0.022   0.988</code></pre>
 <p>The two neighbour objects are the same:</p>
 <pre class="r"><code>all.equal(nb_q, nb_sf_q1, check.attributes=FALSE)</code></pre>
 <pre><code>## [1] TRUE</code></pre>
@@ -1226,12 +1226,12 @@ summary(mod1)</code></pre>
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-##  [1] hglm_2.2-1          hglm.data_1.0-1     MASS_7.3-51.4      
-##  [4] spatialreg_1.1-4    igraph_1.2.4.1      Matrix_1.2-17      
-##  [7] tmap_2.2            spdep_1.1-3         spData_0.3.0       
-## [10] sp_1.3-1            gstat_2.0-2         sf_0.7-5           
-## [13] spatstat_1.60-1     rpart_4.1-15        nlme_3.1-140       
-## [16] spatstat.data_1.4-0
+##  [1] mgcv_1.8-28         hglm_2.2-1          hglm.data_1.0-1    
+##  [4] MASS_7.3-51.4       spatialreg_1.1-4    igraph_1.2.4.1     
+##  [7] Matrix_1.2-17       tmap_2.2            spdep_1.1-2        
+## [10] spData_0.3.0        sp_1.3-1            gstat_2.0-2        
+## [13] sf_0.7-5            spatstat_1.60-1     rpart_4.1-15       
+## [16] nlme_3.1-140        spatstat.data_1.4-0
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] satellite_1.0.1       xts_0.11-2            webshot_0.5.1        
@@ -1239,33 +1239,32 @@ summary(mod1)</code></pre>
 ##  [7] tools_3.6.0           backports_1.1.4       metafor_2.1-0        
 ## [10] utf8_1.1.4            rgdal_1.4-5           R6_2.4.0             
 ## [13] KernSmooth_2.23-15    colorspace_1.4-1      rgeos_0.4-3          
-## [16] DBI_1.0.0             mgcv_1.8-28           raster_2.9-5         
-## [19] tidyselect_0.2.5      leaflet_2.0.2         compiler_3.6.0       
-## [22] cli_1.1.0             expm_0.999-4          scales_1.0.0         
-## [25] classInt_0.3-4        goftest_1.1-1         stringr_1.4.0        
-## [28] digest_0.6.19         spatstat.utils_1.13-0 fftwtools_0.9-8      
-## [31] rmarkdown_1.13        base64enc_0.1-3       dichromat_2.0-0      
-## [34] pkgconfig_2.0.2       htmltools_0.3.6       htmlwidgets_1.3      
-## [37] rlang_0.4.0           FNN_1.1.3             shiny_1.3.2          
-## [40] BayesXsrc_3.0-1       generics_0.0.2        zoo_1.8-6            
-## [43] crosstalk_1.0.0       gtools_3.8.1          dplyr_0.8.2          
-## [46] magrittr_1.5          munsell_0.5.0         Rcpp_1.0.1           
-## [49] fansi_0.4.0           abind_1.4-5           stringi_1.4.3        
-## [52] yaml_2.2.0            tmaptools_2.0-1       grid_3.6.0           
-## [55] gdata_2.18.0          promises_1.0.1        crayon_1.3.4         
-## [58] deldir_0.1-21         lattice_0.20-38       splines_3.6.0        
-## [61] tensor_1.5            zeallot_0.1.0         knitr_1.23           
-## [64] pillar_1.4.2          boot_1.3-22           spacetime_1.2-3      
-## [67] stats4_3.6.0          codetools_0.2-16      LearnBayes_2.15.1    
-## [70] XML_3.98-1.20         glue_1.3.1            evaluate_0.14        
-## [73] png_0.1-7             vctrs_0.1.0           httpuv_1.5.1         
-## [76] RANN_2.6.1            purrr_0.3.2           polyclip_1.10-0      
-## [79] tidyr_0.8.3           assertthat_0.2.1      R2BayesX_1.1-1       
-## [82] xfun_0.8              mime_0.7              lwgeom_0.1-7         
-## [85] xtable_1.8-4          broom_0.5.2.9001      e1071_1.7-2          
-## [88] coda_0.19-2           later_0.8.0           viridisLite_0.3.0    
-## [91] class_7.3-15          tibble_2.1.3          intervals_0.15.1     
-## [94] units_0.6-3           spDataLarge_0.3.1</code></pre>
+## [16] DBI_1.0.0             raster_2.9-5          tidyselect_0.2.5     
+## [19] leaflet_2.0.2         compiler_3.6.0        cli_1.1.0            
+## [22] expm_0.999-4          scales_1.0.0          classInt_0.3-4       
+## [25] goftest_1.1-1         stringr_1.4.0         digest_0.6.19        
+## [28] spatstat.utils_1.13-0 rmarkdown_1.13        base64enc_0.1-3      
+## [31] dichromat_2.0-0       pkgconfig_2.0.2       htmltools_0.3.6      
+## [34] htmlwidgets_1.3       rlang_0.4.0           FNN_1.1.3            
+## [37] shiny_1.3.2           BayesXsrc_3.0-1       generics_0.0.2       
+## [40] zoo_1.8-6             crosstalk_1.0.0       gtools_3.8.1         
+## [43] dplyr_0.8.2           magrittr_1.5          munsell_0.5.0        
+## [46] Rcpp_1.0.1            fansi_0.4.0           abind_1.4-5          
+## [49] stringi_1.4.3         yaml_2.2.0            tmaptools_2.0-1      
+## [52] grid_3.6.0            gdata_2.18.0          promises_1.0.1       
+## [55] crayon_1.3.4          deldir_0.1-21         lattice_0.20-38      
+## [58] splines_3.6.0         tensor_1.5            zeallot_0.1.0        
+## [61] knitr_1.23            pillar_1.4.2          boot_1.3-22          
+## [64] spacetime_1.2-2       stats4_3.6.0          codetools_0.2-16     
+## [67] LearnBayes_2.15.1     XML_3.98-1.20         glue_1.3.1           
+## [70] evaluate_0.14         png_0.1-7             vctrs_0.1.0          
+## [73] httpuv_1.5.1          RANN_2.6.1            purrr_0.3.2          
+## [76] polyclip_1.10-0       tidyr_0.8.3           assertthat_0.2.1     
+## [79] R2BayesX_1.1-1        xfun_0.8              mime_0.7             
+## [82] lwgeom_0.1-7          xtable_1.8-4          broom_0.5.2          
+## [85] e1071_1.7-2           coda_0.19-2           later_0.8.0          
+## [88] viridisLite_0.3.0     class_7.3-15          tibble_2.1.3         
+## [91] intervals_0.15.1      units_0.6-3           spDataLarge_0.3.1</code></pre>
 </div>
 <div id="references" class="section level2 unnumbered">
 <h2>References</h2>
