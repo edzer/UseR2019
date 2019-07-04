@@ -1,19 +1,758 @@
 ---
 title: "UseR! 2019 Spatial workshop part II"
 author: "Roger Bivand"
-date: "2019-06-21"
-output: html_document
+date: "July 9, 2019"
+output: 
+  html_document:
+    toc: true
+theme: united
+bibliography: useR19_II.bib
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
-## Organisation (75 minutes)
+### Required current contributed CRAN packages:
 
-* Spatial modelling: why and which kinds; is spatial autocorrelation just poor data collection design and/or model mis-specification? (15)
-* Exercise + review (10)
-* Spatial modelling: graph/weight-based neighbours; spatially structured random effects (15)
-* Exercise + review (10)
-* Spatial regression: simultaneous and conditional autoregressive approaches (15)
-* Exercise + review (10)
+spatstat
+sf
+gstat
+spdep
+tmap
+spatialreg
+igraph
+hglm
+metafor
+sp
+spData
+RANN
+
+and spDataLarge - `install.packages("spDataLarge", repos = "https://nowosad.github.io/drat/", type = "source")`.
+
+### Script
+
+Script at (https://raw.githubusercontent.com/edzer/UseR2019/master/part2.R).
+
+
+## Is spatial autocorrelation just poor data collection design and/or model mis-specification?
+
+- Spatial, time series, and spatio-temporal data breaks the fundamental rule of independence of observations (social networks do too)
+
+- Often, we are not sampling from a known population to get observations, so caution is needed for inference
+
+- Often again, the observation units or entities are not chosen by us, but by others
+
+- Designing spatial samples has become a less important part of the field than previously [@ripley:81; @mueller:07]
+
+### Spatial modelling: why?
+
+- If we want to detect and classify patterns (ML), infer about covariates, or interpolate from a fitted model, we need models that take account of the possible interdependency of spatial, time series and spatio-temporal observations
+
+- Here we are focussing on the spatial case; time differs in having a direction of flow, and spatio-temporal processes are necessarily more complex, especially when non-separable
+
+- We will not look at machine learning issues, although the partition into training and test sets raises important spatial questions for tuning [@SCHRATZ2019109]
+
+### Spatial modelling: which kinds?
+
+- Spatial point processes are most closely tied to the relative positions of the observations, but may accommodate inhomegeneities
+
+- Geostatistics is concerned with interpolating values of a variable of interest at unobserved locations, and the relative positions of the observations contribute through the modelling a function of differences in observed values of that variable between observations at increasing distances from each other
+
+- Disease mapping, spatial econometrics/regression and the application of generalized linear mixed models (GLMM, GAMM) in for example ecology are more interested in inferences about the spatial processes in play and the included covariates; some approaches may use distance based spatial correlation functions, others use graph or lattice neighbourhoods
+
+### When is a "spatial" process actually induced by the analyst
+
+- Sometimes when we use spatial data, we jump to spatial statistical methods because of the widely cited first law of geography, that nearby observations are more likely to be similar than those further away
+
+- But maybe what we see as clustering, patchiness, pattern, that looks spatial is actually mis-specification, such as a missing covariate, and/or inappropriate functional form, and/or including variables acting at different scales, and/or consequences of suboptimal bounding of tesselated observations ...
+
+- Here, we'll first look at the consequences of treating inhomogeneous point as homogeneous (the intensity trends upwards with `x`)
+
+- Then we'll use those points to see what happens in adding a similar trend to a random variable; empirical variograms are constructed ignoring and including the trend, and tests for global and local spatial autocorrelation are calculated
+
+### Spatial point processes
+
+We can start by using **spatstat** [@baddeley2015spatial] to generate completely spatially random (CSR) points with intensity increasing with `x` to introduce trend inhomogeneity in a unit square (note the use of `set.seed()`:
+
+```{r, echo=TRUE}
+suppressPackageStartupMessages(library(spatstat))
+intenfun <- function(x, y) 200 * x
+set.seed(1)
+(ihpp <- rpoispp(intenfun, lmax = 200))
+```
+
+
+```{r, echo=TRUE, out.width='90%', fig.align='center'}
+plot(density(ihpp), axes=TRUE)
+points(ihpp, col="green2", pch=19)
+```
+
+We can use $\hat{K}$ tests ignoring and including inhomogeneity to adapt the test to the underlying data generation process. The homogeneous test examines the divergence from a theoretical CSR at distance bins, the inhomogeneous tries to guess the kind of patterning in the relative positions of the point observations. If we ignore the inhomogeneity, we find significant clustering at most distances, with the opposite finding when using the test attempting to accommodate inhomogeneity:
+
+```{r, echo=TRUE, out.width='90%', fig.align='center'}
+opar <- par(mfrow=c(1,2))
+plot(envelope(ihpp, Kest, verbose=FALSE), main="Homogeneous")
+plot(envelope(ihpp, Kinhom, verbose=FALSE), main="Inhomogeneous")
+par(opar)
+```
+
+### Adding a `y` trend variable
+
+Coercing the **spatstat** `"ppp"` object to an **sf** `"sf"` object is trivial, but first adds the window of the point process, which we need to drop by retaining only those labelled `"point"`. Then we take the `x` coordinate and use it to create `y`, which trends with `x`; the DGP is not very noisy.
+
+```{r, echo=TRUE, out.width='90%', fig.align='center'}
+library(sf)
+#st_as_sf(ihpp) %>% dplyr::filter(label == "point") -> sf_ihpp
+st_as_sf(ihpp) ->.; .[.$label == "point",] -> sf_ihpp
+crds <- st_coordinates(sf_ihpp)
+sf_ihpp$x <- crds[,1]
+sf_ihpp$y <- 100 + 50 * sf_ihpp$x + 20 * rnorm(nrow(sf_ihpp))
+plot(sf_ihpp[,"y"], pch=19)
+```
+
+### Variogram model
+
+Variograms for models ignoring (`y ~ 1`) and including (`y ~ x`) the trend; if we ignore the trend, we find spurious relationships, shown by `loess()` fits
+
+```{r, echo=TRUE, out.width='90%', fig.align='center'}
+suppressPackageStartupMessages(library(gstat))
+vg0 <- variogram(y ~ 1, sf_ihpp)
+vg1 <- variogram(y ~ x, sf_ihpp)
+opar <- par(mfrow=c(1,2))
+plot(gamma ~ dist, vg0, ylim=c(0,550), main="Trend ignored")
+s <- seq(0, 0.5, 0.01)
+p0 <- predict(loess(gamma ~ dist, vg0, weights=np), newdata=data.frame(dist=s), se=TRUE)
+lines(s, p0$fit)
+lines(s, p0$fit-2*p0$se.fit, lty=2)
+lines(s, p0$fit+2*p0$se.fit, lty=2)
+plot(gamma ~ dist, vg1, ylim=c(0,550), main="Trend included")
+p1 <- predict(loess(gamma ~ dist, vg1, weights=np), newdata=data.frame(dist=s), se=TRUE)
+lines(s, p1$fit)
+lines(s, p1$fit-2*p1$se.fit, lty=2)
+lines(s, p1$fit+2*p1$se.fit, lty=2)
+par(opar)
+```
+
+### Spatial autocorrelation
+
+Going on from a continuous to a discrete treatment of space, we can use functions in **spdep** to define neighbours and then test for global and local spatial autocorrelation. Making first a triangulated neighbour objects, we can thin out improbable neighbours lying too far from one another using a sphere of influence graph to make a symmetric neighbour object:
+
+```{r, echo=TRUE, results='hide', message=FALSE}
+suppressPackageStartupMessages(library(spdep))
+nb_tri <- tri2nb(crds)
+```
+
+```{r, echo=TRUE}
+(nb_soi <- graph2nb(soi.graph(nb_tri, crds), sym=TRUE))
+```
+
+The sphere of influence graph generates three subgraphs; a bit unfortunate, but we can live with that (for now):
+
+```{r, echo=TRUE, out.width='90%', fig.align='center'}
+plot(nb_soi, crds)
+```
+
+```{r, echo=TRUE}
+comps <- n.comp.nb(nb_soi)
+sf_ihpp$comps <- comps$comp.id
+comps$nc
+```
+
+Using binary weights, looking at the variable but ignoring the trend, we find strong global spatial autocorrelation using global Moran's $I$ (tests return `"htest"` objects tidied here using **broom**)
+
+```{r, echo=TRUE, warning=FALSE, message=FALSE}
+lwB <- nb2listw(nb_soi, style="B")
+out <- broom::tidy(moran.test(sf_ihpp$y, listw=lwB, randomisation=FALSE, alternative="two.sided"))[1:5]
+names(out)[1:3] <- c("Moran's I", "Expectation", "Variance"); out
+```
+
+If, however, we take the residuals after including the trend using a linear model, the apparent spatial autocorrelation evaporates
+
+```{r, echo=TRUE}
+lm_obj <- lm(y ~ x, data=sf_ihpp)
+out <- broom::tidy(lm.morantest(lm_obj, listw=lwB, alternative="two.sided"))[1:5]
+names(out)[1:3] <- c("Moran's I", "Expectation", "Variance"); out
+```
+
+The same happens if we calculate local Moran's $I$ ignoring the trend (randomisation assumption), and including the trend (normality assumption and saddlepoint approximation)
+
+```{r, echo=TRUE}
+lmor0 <- localmoran(sf_ihpp$y, listw=lwB, alternative="two.sided")
+lmor1 <- as.data.frame(localmoran.sad(lm_obj, nb=nb_soi, style="B", alternative="two.sided"))
+sf_ihpp$z_value <- lmor0[,4]
+sf_ihpp$z_lmor1_N <- lmor1[,2]
+sf_ihpp$z_lmor1_SAD <- lmor1[,4]
+```
+
+```{r, echo=TRUE, warning=FALSE, out.width='90%', fig.align='center', width=7, height=4}
+suppressPackageStartupMessages(library(tmap))
+tm_shape(sf_ihpp) + tm_symbols(col=c("z_value", "z_lmor1_N", "z_lmor1_SAD"), midpoint=0) + tm_facets(free.scales=FALSE, nrow=1) + tm_layout(panel.labels=c("No trend", "Trend, normal", "Trend, SAD"))
+```
+
+
+## Exercise + review
+
+Try doing this in pairs or small groups and discuss what is going on; the underlying ideas are more important than the code.
+
+Look at the [North Carolina SIDS data vignette](https://r-spatial.github.io/spdep/articles/sids.html) for background:
+
+```{r, echo=TRUE}
+library(sf)
+nc <- st_read(system.file("shapes/sids.shp", package="spData")[1], quiet=TRUE)
+st_crs(nc) <- "+proj=longlat +datum=NAD27"
+row.names(nc) <- as.character(nc$FIPSNO)
+head(nc)
+```
+
+The variables are largely count data, `L_id` and `M_id` are grouping variables. We can also read the original neighbour object:
+
+```{r, echo=TRUE, warning=FALSE}
+library(spdep)
+gal_file <- system.file("weights/ncCR85.gal", package="spData")[1]
+ncCR85 <- read.gal(gal_file, region.id=nc$FIPSNO)
+ncCR85
+```
+
+```{r, echo=TRUE, warning=TRUE, out.width='90%', fig.align='center', width=7, height=4}
+plot(st_geometry(nc), border="grey")
+plot(ncCR85, st_centroid(st_geometry(nc), of_largest_polygon), add=TRUE, col="blue")
+```
+Now generate a random variable. Here I've set the seed - maybe choose your own, and compare outcomes with the people around you. With many people in the room, about 5 in 100 may get a draw that is autocorrelated when tested with Moran's $I$ (why?).
+
+```{r, echo=TRUE}
+set.seed(1)
+nc$rand <- rnorm(nrow(nc))
+lw <- nb2listw(ncCR85, style="B")
+moran.test(nc$rand, listw=lw, alternative="two.sided")
+```
+
+Now we'll create a trend (maybe try plotting `LM` to see the trend pattern). Do we get different test outcomes by varying beta and sigma (alpha is constant).
+
+```{r, echo=TRUE}
+nc$LM <- as.numeric(interaction(nc$L_id, nc$M_id))
+alpha <- 1
+beta <- 0.5
+sigma <- 2
+nc$trend <- alpha + beta*nc$LM + sigma*nc$rand
+moran.test(nc$trend, listw=lw, alternative="two.sided")
+```
+To get back to reality, include the trend in a linear model, and test again. 
+
+```{r, echo=TRUE}
+lm.morantest(lm(trend ~ LM, nc), listw=lw, alternative="two.sided")
+```
+
+So we can manipulate a missing variable mis-specification to look like spatial autocorrelation. Is this informative?
+
+#### Extra problem (own time after we're done if you like):
+
+Sometimes we only have data on a covariate for aggregates of our units of observation. What happens when we "copy out" these aggregate values to the less aggregated observations? First we'll aggregate `nc` by `LM`, then make a neighbour object for the aggregate units
+
+```{r, echo=TRUE}
+aggLM <- aggregate(nc[,"LM"], list(nc$LM), head, n=1)
+(aggnb <- poly2nb(aggLM))
+```
+
+Next, draw a random sample for the aggregated units:
+
+```{r, echo=TRUE}
+set.seed(1)
+LMrand <- rnorm(nrow(aggLM))
+```
+
+Check that it does not show any spatial autocorrelation:
+
+```{r, echo=TRUE}
+moran.test(LMrand, nb2listw(aggnb, style="B"))
+```
+
+Copy it out to the full data set, indexing on values of LM; the pattern now looks pretty autocorrelated
+
+```{r, echo=TRUE}
+nc$LMrand <- LMrand[match(nc$LM, aggLM$LM)]
+plot(nc[,"LMrand"])
+```
+
+which it is:
+
+```{r, echo=TRUE}
+moran.test(nc$LMrand, listw=lw, alternative="two.sided")
+```
+
+Again, we've manipulated ourselves into a situation with abundant spatial autocorrelation at the level of the counties, but only by copying out from a more aggregated level. What is going on?
+
+
+## Graph/weight-based neighbours; spatially structured random effects
+
+### Graph/weight-based neighbours
+
+- Some spatial processes are best represented by decreasing functions of distance
+
+- Other spatial processes best represent proximity, contiguity, neighbourhood; the functions then relate to steps along edges on graphs of neighbours
+
+- Under certain conditions, the power series $\rho^i {\mathbf W}^i$ declines in intensity as $i$ increases from $0$ 
+
+- Here we will use areal support, corresponding to a proximity view of spatial processes [@wall:04]
+
+### Polish presidential election 2015 data set
+
+We'll use a typical moderate sized data set of Polish municipalities (including boroughs in the capital, Warsaw), included in **spDataLarge** as used in [Geocomputation with R](https://geocompr.robinlovelace.net/) [@geocompr]
+
+```{r, echo=TRUE}
+library(sf)
+# if(!require("spData", quietly=TRUE)) install.packages("spData")
+# if(!require("spDataLarge", quietly=TRUE)) install.packages("spDataLarge",
+#   repos = "https://nowosad.github.io/drat/", type = "source")
+data(pol_pres15, package="spDataLarge")
+head(pol_pres15[, c(1, 4, 6)])
+```
+
+The dataset has 2495 observations with areal support on 65 variables, most counts of election results aggregated from the election returns by polling station. See:
+
+```{r, echo=TRUE, eval=FALSE}
+?spDataLarge::pol_pres15
+```
+
+for details.
+
+### Contiguous, proximate neighbours
+
+The **spdep** function `poly2nb()` finds proximate, contiguous neighbours by finding one (queen) or two (rook) boundary points within a snap distance of each other for polygons in a candidate list based on intersecting bounding boxes:
+
+```{r, echo=TRUE}
+suppressPackageStartupMessages(library(spdep))
+system.time(nb_q <- poly2nb(pol_pres15, queen=TRUE))
+```
+The object returned is very sparse; the print method reports asymmetric objects and objects with observations with no neighbours.
+
+```{r, echo=TRUE}
+nb_q
+```
+
+```{r, echo=TRUE}
+opar <- par(mar=c(0,0,0,0)+0.5)
+plot(st_geometry(pol_pres15), border="grey", lwd=0.5)
+coords <- st_centroid(st_geometry(pol_pres15),
+  of_largest_polygon=TRUE)
+plot(nb_q, coords=st_coordinates(coords), add=TRUE, points=FALSE, lwd=0.5)
+par(opar)
+```
+
+We can use GEOS through **sf** to improve the speed of detection of candidate neighbours, by building a geometry column of bounding boxes of the underlying polygons and finding which intersect. We pass this object to `poly2nb()` through the `foundInBox=` argument. This may be useful for larger data sets.
+
+```{r, echo=TRUE}
+system.time({
+  fB1 <- st_intersects(st_as_sfc(lapply(st_geometry(pol_pres15), function(x) {
+    st_as_sfc(st_bbox(x))[[1]]
+  })))
+  fB1a <- lapply(seq_along(fB1), function(i) fB1[[i]][fB1[[i]] > i])
+  fB1a <- fB1a[-length(fB1a)]
+  nb_sf_q1 <- poly2nb(pol_pres15, queen=TRUE, foundInBox=fB1a)
+})
+```
+
+The two neighbour objects are the same:
+
+```{r, echo=TRUE}
+all.equal(nb_q, nb_sf_q1, check.attributes=FALSE)
+```
+
+We can further check the object for the number of distinct graph components; there is only one, so each observation can be reached from every other observation by traversing the graph edges:
+
+```{r, echo=TRUE}
+n.comp.nb(nb_q)$nc
+```
+
+The `"listw"` spatial weights object needed for testing or modelling can be created using `nb2listw()`, here with binary weights, $1$ for first-order contiguity, $0$ for not a neighbour:
+
+```{r, echo=TRUE}
+lw <- nb2listw(nb_q, style="B")
+```
+
+We can coerce this further to a sparse matrix as defined in the **Matrix** package:
+
+```{r, echo=TRUE, results='hide', message=FALSE}
+library(Matrix)
+W <- as(lw, "CsparseMatrix")
+```
+
+and check symmetry directly, (`t()` is the transpose method):
+
+```{r, echo=TRUE}
+isTRUE(all.equal(W, t(W)))
+```
+
+Powering up the sparse matrix fills in the higher order neighbours:
+
+```{r, echo=TRUE}
+image(W)
+```
+
+```{r, echo=TRUE}
+WW <- W %*% W
+image(WW)
+```
+
+```{r, echo=TRUE}
+W3 <- WW %*% W
+image(W3)
+```
+
+```{r, echo=TRUE}
+W4 <- W3 %*% W
+image(W4)
+```
+
+There is an **spdep** vignette considering the use of the **igraph** adjacency representation through sparse matrices as intermediate objects:
+
+```{r, echo=TRUE, message=FALSE}
+library(igraph)
+g1 <- graph.adjacency(W, mode="undirected")
+class(g1)
+```
+
+We can get an `"nb"` neighbour object back from the adjacency representation:
+
+```{r, echo=TRUE}
+B1 <- get.adjacency(g1)
+mat2listw(B1)$neighbours
+```
+There is a single graph component:
+
+```{r, echo=TRUE}
+c1 <- clusters(g1)
+c1$no
+```
+
+The graph is connected:
+
+```{r, echo=TRUE}
+is.connected(g1)
+```
+
+with diameter:
+
+```{r, echo=TRUE}
+dg1 <- diameter(g1)
+dg1
+```
+The diameter is the longest path across the graph, where `shortest.paths()` returns a matrix of all the edge counts on shortest paths between observations:
+
+```{r, echo=TRUE}
+sp_mat <- shortest.paths(g1)
+max(sp_mat)
+str(sp_mat)
+```
+
+So graphs really do contain a lot of structural information, rendering most IDW cases superfluous.
+
+### Spatially structured random effects
+
+The **hglm** hierarchical generalized linear model package uses the `"CsparseMatrix"` version of spatial weights for fitting `"SAR"` or `"CAR"` spatially structured random effects
+
+The **CARBayes** package appears to take dense matrices using `listw2mat()` or `nb2mat()`, preferring binary matrices
+
+The `"mrf"` random effect in the **mgcv** package for use with `gam()` takes an `"nb"` object directly
+
+The `R2BayesX::nb2gra()` function converts an `"nb"` neighbour object into a graph for use with BayesX through **R2BayesX**, but creates a dense matrix; the graph is passed as the `map=` argument to the `"mrf"` structured random effect
+
+```{r, echo=TRUE}
+gra <- R2BayesX::nb2gra(ncCR85)
+str(gra)
+```
+
+The `nb2INLA()` function in **spdep** writes a file that INLA can use through the **INLA** package, used with the `"besag"` model, for example:
+
+```{r, echo=TRUE}
+tf <- tempfile()
+nb2INLA(tf, ncCR85)
+file.size(tf)
+```
+
+## Exercise + review
+
+What does it mean that this neighbour object not symmetric?
+
+```{r, echo=TRUE, warning=FALSE}
+coords <- st_centroid(st_geometry(nc), of_largest_polygon)
+(knn_5_nb <- knn2nb(knearneigh(st_coordinates(coords), k=5)))
+```
+
+
+```{r, echo=TRUE}
+klw <- nb2listw(knn_5_nb, style="B")
+kW <- as(klw, "CsparseMatrix")
+isTRUE(all.equal(kW, t(kW)))
+```
+
+
+```{r, echo=TRUE}
+image(kW)
+```
+
+
+We need to recall that non-symmetric neighbours give directed graphs; if we forget, and treat it as undirected, the extra edges get added (try it):
+
+```{r, echo=TRUE, messages=FALSE}
+library(igraph)
+g1 <- graph.adjacency(kW, mode="directed")
+B1 <- get.adjacency(g1)
+mat2listw(B1)$neighbours
+```
+
+Use **igraph** functions to explore the `ncCR85` `"nb"` object:
+
+```{r, echo=TRUE}
+diameter(g1)
+```
+
+```{r, echo=TRUE}
+nc_sps <- shortest.paths(g1)
+mr <- which.max(apply(nc_sps, 2, max))
+nc$sps1 <- nc_sps[,mr]
+plot(nc[,"sps1"], breaks=0:21)
+```
+```{r, echo=TRUE}
+plot(nc$sps1, c(st_distance(coords[mr], coords))/1000, xlab="shortest path count", ylab="km distance")
+```
+
+
+Discuss whether measured distance is really needed to express proximity; the graph shortest paths look fine.
+
+Make objects from the imported neighbours for BayesX and INLA, and as a sparse and dense matrix:
+
+```{r, echo=TRUE}
+ncCR85a <- ncCR85
+attr(ncCR85a, "region.id") <- as.character(nc$CRESS_ID)
+nc_gra <- R2BayesX::nb2gra(ncCR85a)
+nc_tf <- tempfile()
+nb2INLA(nc_tf, ncCR85)
+nc_lw <- nb2listw(ncCR85, style="B")
+nc_W <- as(nc_lw, "CsparseMatrix")
+nc_mat <- listw2mat(nc_lw)
+```
+
+## Simultaneous and conditional autoregressive approaches
+
+Let's start by seeing whether there is any spatial autocorrelation in the SIDS rate (modified Freeman-Tukey square root transformation):
+
+```{r, echo=TRUE}
+nc$ft.SID74 <- sqrt(1000)*(sqrt(nc$SID74/nc$BIR74) + sqrt((nc$SID74+1)/nc$BIR74))
+nc$ft.NWBIR74 <- sqrt(1000)*(sqrt(nc$NWBIR74/nc$BIR74) + sqrt((nc$NWBIR74+1)/nc$BIR74))
+tm_shape(nc) + tm_fill(c("ft.SID74", "ft.NWBIR74"))
+```
+
+```{r, echo=TRUE}
+plot(ft.SID74 ~ ft.NWBIR74, nc)
+```
+
+First Moran's $I$ with the intercept as 
+
+```{r, echo=TRUE}
+moran.test(nc$ft.SID74, nc_lw, alternative="two.sided", randomisation=FALSE)
+```
+
+Now for a mean model accommodating case weights:
+
+```{r, echo=TRUE}
+lm.morantest(lm(ft.SID74 ~ 1, weights=BIR74, data=nc), nc_lw, alternative="two.sided")
+```
+
+Next just with the original covariate (transformed non-white births as a proportion of all births):
+
+```{r, echo=TRUE}
+lm.morantest(lm(ft.SID74 ~ ft.NWBIR74, data=nc), nc_lw, alternative="two.sided")
+```
+
+Finally with the covariate and case weights:
+
+```{r, echo=TRUE}
+lm.morantest(lm(ft.SID74 ~ ft.NWBIR74, weights=BIR74, data=nc), nc_lw, alternative="two.sided")
+```
+
+So something spatial appears to be present, but how to model it?
+
+### Simultaneous autoregressive approaches
+
+The approach taken by social scientists including economists, and some others has been to approach this through simultaneous autoregressive approaches, where the response is modelled using fixed covariates, and the residual process is modelled by optimising a log likelihood function. The **spatialreg** package provides `spautolm()` and `errorsarlm()`:
+
+```{r, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
+library(spatialreg)
+m1 <- spautolm(ft.SID74 ~ ft.NWBIR74, weights=BIR74, data=nc, listw=nc_lw, family="SAR")
+```
+
+When we include the covariate, the spatial error coefficient contributes little:
+
+```{r, echo=TRUE}
+summary(m1)
+```
+
+It is unusual to present maps of the spatially structured random effect in cases where the simultaneous autoregressive approach is used, but it is fully possible using components of the returned model object (the vector is doubled for comparison with the CAR version):
+
+```{r, echo=TRUE}
+nc$SAR_ssre <- 2*as.vector((m1$lambda * nc_W) %*% m1$Y - (m1$lambda * nc_W) %*% (m1$X %*% m1$fit$coefficients))
+tm_shape(nc) + tm_fill(c("ft.SID74", "SAR_ssre"), midpoint=c(NA, 0))
+```
+
+
+The other maximum likelihood implementation gives the same results, but provides a Hausman test for shifts in the covariate coefficients between the aspatial and spatial estimates [@pace+lesage:08]; there is none:
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+m1a <- errorsarlm(ft.SID74 ~ ft.NWBIR74, weights=BIR74, data=nc, listw=nc_lw)
+summary(m1a, Hausman=TRUE)
+```
+
+It also lets us add `Durbin=` terms, that is spatially lagged covariates:
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+m1b <- errorsarlm(ft.SID74 ~ ft.NWBIR74, weights=BIR74, data=nc, listw=nc_lw, Durbin=TRUE)
+summary(m1b, Hausman=TRUE)
+```
+
+and to present the by-covariate effects taking into account the unlagged (direct) and lagged (indirect) covariates and the sum of the coefficients (total):
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+summary(impacts(m1b))
+```
+
+
+However, our model may suffer from not using a mixed model approach to a count response; the simultaneous autoregressive models are mostly used with Gaussian responses. One possibility is to employ the hierarchical generalized linear model approach from the **hglm** package. First we'll fit an unstructured IID (independent and identically distributed) random effect [@alam-ronnegard-shen:2015]:
+
+```{r, echo=TRUE, results='hide', message=FALSE, warning=FALSE}
+library(hglm)
+E <- nc$BIR74 * sum(nc$SID74)/sum(nc$BIR74)
+HGLM_iid <- hglm(fixed=SID74 ~ ft.NWBIR74, random= ~ 1|CRESS_ID, offset=log(E), weights=BIR74,
+                 data=nc, family=poisson(link=log))
+```
+
+The random effects also have their own standard errors, so we can order and display them with error bars in a forest or caterpillar plot:
+
+```{r, echo=TRUE}
+ranef_iid <- unname(summary(HGLM_iid, print.ranef=TRUE)$RandCoefMat)
+metafor::forest(ranef_iid[,1], ranef_iid[,2], subset=order(ranef_iid[,1], decreasing=TRUE), 
+        slab=NA, annotate=FALSE, lty=c("solid","blank"), pch=19, psize=2, cex.lab=1, cex.axis=1)
+```
+
+We can also fit a weighted Poisson simultaneous autoregressive model, and examine the random effects:
+
+```{r, echo=TRUE, results='hide', message=FALSE, cache=TRUE, warning=FALSE}
+HGLM_sar <- hglm(fixed=SID74 ~ ft.NWBIR74, random= ~ 1|CRESS_ID, offset=log(E), weights=BIR74, 
+                 data=nc, family=poisson(link=log), rand.family=SAR(D=nc_W))
+ranef_sar <- unname(summary(HGLM_sar, print.ranef=TRUE)$RandCoefMat)
+metafor::forest(ranef_sar[,1], ranef_sar[,2], subset=order(ranef_sar[,1], decreasing=TRUE), 
+        slab=NA, annotate=FALSE, lty=c("solid","blank"), pch=19, psize=2, cex.lab=1, cex.axis=1)
+```
+
+There is not much difference between the IID and the SAR spatially structured random effects:
+
+```{r, echo=TRUE}
+nc$HGLM_re <- ranef_iid[,1]
+nc$HGLM_ss_SAR <- ranef_sar[,1]
+tm_shape(nc) + tm_fill(c("HGLM_re", "HGLM_ss_SAR"), midpoint=c(0), title="Poisson HGLM RE") +
+  tm_facets(free.scales=FALSE) + tm_layout(panel.labels=c("IID", "SAR SSRE"))
+```
+
+###  Conditional and MRF autoregressive approaches
+
+Most epidemiological applications use conditional autoregressive approaches, where some (like `spautolm()` and the `hglm()` implementations) fit a spatial coefficient, but many fit an intrinsic CAR. First the `spautolm()` and the `hglm()` implementations:
+
+```{r, echo=TRUE}
+m1c <- spautolm(ft.SID74 ~ ft.NWBIR74, weights=BIR74, data=nc, listw=nc_lw, family="CAR")
+summary(m1c)
+```
+
+Again, we can calculate something that represents the spatial patterning of the spatial process (termed "signal" in the documentation of `spatialreg::predict.sarlm`), but it is not scaled in the same way as the `hgml()` random effects (and importantly we do not have standard errors):
+
+```{r, echo=TRUE}
+nc$CAR_ssre <- as.vector((m1c$lambda * nc_W) %*% m1c$Y - 
+                           (m1c$lambda * nc_W) %*% (m1c$X %*% m1c$fit$coefficients))
+tm_shape(nc) + tm_fill(c("SAR_ssre", "CAR_ssre"), midpoint=c(0), title="Gauss ML RE") +
+  tm_facets(free.scales=FALSE) + tm_layout(panel.labels=c("SAR SSRE", "CAR SSRE"))
+```
+
+Fitting the HGLM CAR model is just like the SAR model, and the forest plot of the spatially structured random effect is similar. Recall that `spautolm()` is fitting a Gaussian model, but `hglm()` is fitting a Poisson model, arguably better suited to count data. This means that the scalings of the random effects will vary in scale:
+
+```{r, echo=TRUE, results='hide', message=FALSE, cache=TRUE, warning=FALSE}
+HGLM_car <- hglm(fixed=SID74 ~ ft.NWBIR74, random= ~ 1|CRESS_ID, offset=log(E), weights=BIR74, 
+                 data=nc, family=poisson(link=log), rand.family=CAR(D=nc_W))
+ranef_car <- unname(summary(HGLM_car, print.ranef=TRUE)$RandCoefMat)
+metafor::forest(ranef_car[,1], ranef_car[,2], subset=order(ranef_car[,1], decreasing=TRUE), 
+        slab=NA, annotate=FALSE, lty=c("solid","blank"), pch=19, psize=2, cex.lab=1, cex.axis=1)
+```
+
+```{r, echo=TRUE}
+nc$HGLM_ss_CAR <- ranef_car[,1]
+tm_shape(nc) + tm_fill(c("HGLM_ss_CAR", "HGLM_ss_SAR"), midpoint=c(0), title="Poisson HGLM RE") +
+  tm_facets(free.scales=FALSE) + tm_layout(panel.labels=c("CAR SSRE", "SAR SSRE"))
+```
+
+To use a generalized additive mixed model (`mgcv::gam()` with an `"mrf"` random effect), and some other mixed models, the areal entities need to be grouped (done in the first exercise), and we can try a flexible fit on the covariate:
+
+```{r, echo=TRUE, results='hide', message=FALSE, cache=TRUE, warning=FALSE}
+library(mgcv)
+names(aggnb) <- as.character(aggLM$Group.1)
+nc$LM <- as.factor(nc$LM)
+GAM_mrf <- gam(SID74 ~ s(ft.NWBIR74) + s(LM, bs="mrf", xt=list(nb=aggnb)), offset=log(E), weights=BIR74, data=nc, family=poisson(link=log))
+summary(GAM_mrf)
+```
+
+And plot the covariate smooth term:
+
+```{r, echo=TRUE}
+plot(GAM_mrf)
+```
+
+The forest plot is obviously grouped too:
+
+```{r, echo=TRUE}
+GAM_mrf_re <- predict(GAM_mrf, type="terms", se=TRUE)
+metafor::forest(GAM_mrf_re$fit[,2], GAM_mrf_re$se.fit[,2], subset=order(GAM_mrf_re$fit[,1], decreasing=TRUE), 
+        slab=NA, annotate=FALSE, lty=c("solid","blank"), pch=19, psize=2, cex.lab=1, cex.axis=1)
+```
+
+as is the RE map:
+
+```{r, echo=TRUE}
+nc$GAM_mrf_re <- GAM_mrf_re$fit[,2]
+tm_shape(nc) + tm_fill(c("GAM_mrf_re"), midpoint=c(0), title="Poisson GAM MRF RE")
+```
+
+
+## Exercise + review
+
+The New York 8 county data set contains population standardized leukemia cases, with `Z` as a transformed rate:
+
+```{r, echo=TRUE}
+NY8 <- st_read(system.file("shapes/NY8_utm18.shp", package="spData"))
+```
+
+
+```{r, echo=TRUE}
+tm_shape(NY8) + tm_fill("Z")
+```
+
+Create a neighbour object:
+
+```{r, echo=TRUE}
+NY_nb <- poly2nb(NY8)
+NY_lw <- nb2listw(NY_nb, style="B")
+```
+
+Check how the SAR and CAR models behave, with and without case weights:
+
+```{r, echo=TRUE}
+mod1 <- spautolm(Z ~ PEXPOSURE + PCTAGE65P + PCTOWNHOME, data=NY8, family="CAR", listw=NY_lw, weights=POP8)
+summary(mod1)
+```
+
+This data set is used Waller and Gotway [-@WallerGotway:2004], and in both editions of ASDAR. It is harder to deploy Poisson models because the cases are not integer counts.
+
+## R's `sessionInfo()`
+
+```{r sI, echo = TRUE}
+sessionInfo()
+```
+
+## References 
+
