@@ -359,6 +359,61 @@ quantile" to `classInt::classIntervals()`, which causes [histogram
 stretching](https://en.wikipedia.org/wiki/Histogram_equalization);
 this is done over all 6 bands.
 
+### stars: out-of-memory (if time permits)
+
+Copernicus' [Sentinel 2](https://en.wikipedia.org/wiki/Sentinel-2)
+provides the state-of-the art multispectral satellite images of
+today: 10 m resolution, 5 days intervals. A sample image is provided
+in the (off-CRAN) 1 Gb `starsdata` package:
+
+```{r eval=FALSE}
+install.packages("starsdata", repos = "https://cran.uni-muenster.de/pebesma" , type = "source")
+library(starsdata)
+```
+
+```{r echo=FALSE,eval=TRUE}
+library(starsdata)
+```
+
+We will read in the four 10-m resolution bands:
+
+```{r}
+granule = system.file("sentinel/S2A_MSIL1C_20180220T105051_N0206_R051_T32ULE_20180221T134037.zip", package = "starsdata")
+base_name = strsplit(basename(granule), ".zip")[[1]]
+s2 = paste0("SENTINEL2_L1C:/vsizip/", granule, "/", base_name, ".SAFE/MTD_MSIL1C.xml:10m:EPSG_32632")
+(p = read_stars(s2, proxy = TRUE))
+object.size(p)
+```
+
+As we can see, this object contains no data, but only a pointer to the data. Plotting it,
+
+```{r}
+system.time(plot(p))
+```
+
+takes less than a second, because only pixels that can be seen are
+read; plotting the full 10000 x 10000 images would have taken more
+than 10 minutes.
+
+We can compute an index like [ndvi](https://en.wikipedia.org/wiki/Normalized_difference_vegetation_index), and plot it:
+
+```{r}
+ndvi = function(x) (x[4] - x[1])/(x[4] + x[1])
+rm(x)
+(s2.ndvi = st_apply(p, c("x", "y"), ndvi))
+system.time(plot(s2.ndvi)) # read - compute ndvi - plot
+```
+
+where lazy evaluation is used: `s2.ndvi` still contains no pixels,
+but only `plot` calls for them, and instructs `st_apply` to only
+work on the resolution called for. If we would save `s2.ndvi` to
+disk, the full resolution would be computed: the command
+
+```{r eval=FALSE}
+write_stars(s2.ndvi, "s2.tif")
+```
+takes 5 minutes and writes a 500 Mb GeoTIFF.
+
 ### Exercises
 
 1. Start R, install package `stars` (if not already present), and load it
@@ -371,16 +426,76 @@ this is done over all 6 bands.
 
 ## C. Raster/vector data cubes, large rasters (20' + 10' exercises)
 
-### stars: time, raster, data cubes (15')
+This section tries to bring everything together: simple features,
+vector data, time series, and rasters.
 
 ### spatial time series
-### raster data
-### raster stacks
-### O-D matrices
 
-### stars: out-of-memory (5')
+We will create a stars object from the space/time matrix in `air`:
+
+```{r}
+a = air[,sel]
+dim(a)
+library(units)
+(a.st = st_as_stars(list(PM10 = set_units(air[,sel], ppm))))
+```
+however, this has still no knowledge of space and time dimensions, and reference systems. We can add this:
+
+```{r}
+crs = 32632 # UTM zone 32N
+a.st %>% 
+  st_set_dimensions(1, values = st_as_sfc(stations)) %>% 
+  st_set_dimensions(2, values = dates[sel]) %>% 
+  st_transform(crs) -> a.st2
+a.st2
+st_bbox(a.st2)
+st_crs(a.st2)
+```
 
 ### geostatistics with sf and stars (10')
+
+We can interpolate these spatial time series, when we have a target grid, e.g.
+created by
+
+```{r}
+DE_NUTS1 %>% st_as_sfc() %>% st_transform(crs) -> de # DE_NUTS1 is part of the "air" datasets
+grd = st_as_stars(de)
+grd[[1]][grd[[1]] == 0] = NA
+plot(grd, axes = TRUE)
+```
+
+We will simply pick a variogram model, without properly fitting it to sample space/time sample variograms:
+```{r}
+library(gstat)
+model <- vgmST("productSum",
+    space=vgm(150, "Exp", 5000, 0),
+    time= vgm(20, "Sph",    10, 0),
+    k=2)
+```
+
+```{r}
+t4 = dates[sel][1:12]
+d = dim(grd)
+st_as_stars(pts = array(1, c(d[1], d[2], time=length(t4)))) %>%
+    st_set_dimensions("time", t4) %>%
+    st_set_dimensions("x", st_get_dimension_values(grd, "x")) %>%
+    st_set_dimensions("y", st_get_dimension_values(grd, "y")) %>%
+    st_set_crs(crs) -> grd.st
+new_int <- krigeST(PM10~1, data = a.st2, newdata = grd.st,
+         nmax = 50, stAni = 1000, modelList = model,
+         progress = FALSE)
+plot(new_int[2,,,1], reset = FALSE)
+plot(de, col = NA, border = 'red', add = TRUE)
+plot(st_geometry(no2.sf), col = 'green', add = TRUE, pch = 16)
+```
+
+A more worked out case study on this type of data is found in the geostatistics/interpolation chapter
+of [@sdsr].
+
+### stars: time, raster, data cubes (15')
+
+
+### Transforming rasters
 
 ### Exercises
 
