@@ -1,18 +1,226 @@
 ---
 title: "UseR! 2019 Spatial workshop part I"
 author: "Edzer Pebesma"
-date: "6/18/2019"
-output: html_document
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+bibliography: useR19_I.bib
+link-citations: yes
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Organisation (75 minutes)
+## Part I (90')
 
-* intro; intro sf (20 mins)
-* raster data, array data (10 mins)
-* temporal, spatiotemporal data (10 mins)
-* data cubes; stars (20 mins)
-* ...
+* Spatial data, simple features (20' + 10' exercises)
+* Raster data, temporal data (20' + 10' exercises)
+* Raster/vector data cubes, large rasters (20' + 10' exercises)
+
+## Spatial data and simple features
+
+Since data collections can only be done _somewhere_, and at _some
+time_, all data is, in principle spatial and temporal. In many cases
+location are implicit, and for instance encoded as ID of an object.
+In other cases, locations are encoded with _coordinates_.
+
+Coordinates can be three-dimensional $(x, y, z)$, but are in many
+cases two-dimensional $(x, y)$. For _geo_ spatial data, that is,
+data that are Earth-bound, two-dimensional coordinates are either 
+
+* [geographic](https://en.wikipedia.org/wiki/Geographic_coordinate_system):
+angles (degrees longitude and latitude), pointing out locations on an
+[ellipsoid](https://en.wikipedia.org/wiki/Earth_ellipsoid) or sphere
+* projected: measured in a two-dimensional flat
+space, e.g. in metres, related to an ellipsoid by
+[_projection_](https://en.wikipedia.org/wiki/Map_projection)
+
+A **coordinate reference sytem** (CRS) describes how coordinates
+are to be interpreted: which location on Earth do they refer to. In
+case of projected coordinates the CRS contains the projection type
+and parameters, in all cases which reference ellipsoid the original
+geographic coordinates are associated with (e.g., WGS84, or NAD27).
+
+### Objects and fields, features
+
+It makes in many cases sense to distinguish to "types" of spatial
+information, depending on whether variation is discrete or continuous
+_over space_:
+
+* **objects** are discrete things: houses, cars, rivers, persons, which have a location and other properties
+* **fields** are continuous phenomena: temperature and pressure of air, elevation of the Earth surface; fields are essentially _functions_ mapping from two- or three-dimensional space (and possibly time) to a value.
+
+[OGC](https://www.opengeospatial.org/), a standardisation
+body for geospatial information, defines in its [abstract
+specification](http://www.opengeospatial.org/docs/as) a
+[feature](https://www.opengeospatial.org/standards/sfa) as an
+"abstraction of real world phenomena" that has a geometry and
+attributes (other characteristics). Abstractions of both objects
+and fields are considered **features**.
+
+**Simple features** are features with all geometric attributes
+described piecewise by straight line or planar interpolation between
+sets of points [@sfa]; simple feature geometries are of type
+
+* `point`, `multipoint`, 
+* `linestring`, `multilinestring`, 
+* `polygon`, `multipolygon`, or
+* combinations of these (`geometrycollection`).
+
+**Coverages** is the term OGC uses to represent field variables; the
+are typically (but not necessarily) associated with raster data.
+
+### Support
+
+In the following figure:
+
+```{r echo=FALSE}
+knitr::include_graphics('landuse.png')
+```
+
+what is the value at the point location pointed to with the arrow?
+
+* For _land use_, we have an infinite set of point observations;
+for every point in the polygon we know the land use; although this
+would maybe be only one _record_ in our tables, this is a field
+variable (or "coverage") representing a large set of points.
+* for _population density_ we have a single observation, which is
+an aggregation for the entire polygon (the sum of the inhabitants,
+divided by the polygon area). This is a feature attribute.
+
+**Support** is the physical size (length, area, volume) a single
+quantity, or measurement, is associated with. For the land use
+variable, we have _point support_. For the population density
+variable we have support the _size of the area aggreated over_.
+
+### intro to `sf`
+
+`sf` uses the OSGEO stack of software:
+```{r}
+library(tidyverse) # although not needed for working with sf!
+library(sf)
+```
+
+```{r echo=FALSE}
+knitr::include_graphics('sf_deps.png')
+```
+
+Package `sf` provides handling of feature data, where feature
+geometries are points, lines, polygons or combinations of those.
+It implements the full set of geometric functions described in the
+_simple feature access_ standard, and some. The basic storage is
+very simple, and uses only base R types (list, matrix).
+
+* feature sets are held as records (rows) in `sf` objects, inheriting from `data.frame` or `tbl_df`
+* `sf` objects have at least one simple feature geometry list-column of class `sfc`
+* `sfc` geometry list-columns have a bounding box and a coordinate reference system as attribute, and a class attribute pointing out the common type (or `GEOMETRY` in case of a mix)
+* a single simple feature geometry is of class `sfg`, and further classes pointing out dimension and type
+
+Storage of simple feature geometry:
+
+* `POINT` is a numeric vector
+* `LINESTRING` and `MULTIPOINT` are numeric matrix, points/vertices in rows
+* `POLYGON` and `MULTILINESTRING` are lists of matrices
+* `MULTIPOLYGON` is a lists of those
+* `GEOMETRYCOLLECTION` is a list of typed geometries
+
+To build from scratch:
+```{r}
+p1 = st_point(c(3,5))
+class(p1)
+p2 = st_point(c(4,6))
+p3 = st_point(c(4,4))
+pts = st_sfc(p1, p2, p3)
+class(pts)
+sf = st_sf(a = c(3,2.5,4), b = c(1,2,4), geom = pts)
+class(sf)
+sf = st_as_sf(tibble::tibble(a = c(3,2.5,4), b = c(1,2,4), geom = pts))
+class(sf)
+sf
+plot(sf, cex = 3, pch = 16, key.pos = 1, breaks = seq(.5,4.5,1), pal = sf.colors(4))
+```
+
+We can read some real data:
+
+```{r}
+nc = read_sf(system.file("gpkg/nc.gpkg", package="sf")) # read as sf-tibble
+agr = c(AREA = "aggregate", PERIMETER = "aggregate", CNTY_ = "identity",
+  CNTY_ID = "identity", NAME = "identity", FIPS = "identity", FIPSNO = "identity",
+  CRESS_ID = "identity", BIR74 = "aggregate", SID74 = "aggregate", NWBIR74 = "aggregate",
+  BIR79 = "aggregate", SID79 = "aggregate", NWBIR79  = "aggregate")
+st_agr(nc) = agr 
+nc[c(9:11,15)]
+```
+
+where `st_agr` specifies the _attribute geometry relationship_,
+indicating for each attribute whether we have polygon support
+(`aggregate`) or point support (`constant` or `identity`) for
+the attributes.
+
+Suppose we want to query the `nc` dataset at `POINT (-78.25073 34.07663)` (so-called _well known text_ encoding of points with these x and y coordinate), then we can do this by
+
+```{r}
+pt = st_as_sfc("POINT (-78.25073 34.07663)")
+st_intersection(nc, st_sfc(pt, crs = st_crs(nc)))
+```
+
+This generates a warning because some of the variables have non-point
+support, meaning that probably a meaningless value is now attached
+to a point geometry. The warning is not emitted if the attribute variable 
+returned has point support, as in
+
+```{r}
+i = st_intersection(nc["CNTY_"], st_sfc(pt, crs = st_crs(nc)))
+```
+
+The remaining warning is justified, as we are doing 2D flat geometry
+on spherical (ellipsoidal), geographical coordinates. This is often
+works out, but not always. It goes away when we work with projected
+(planar) coordinates, e.g. in
+
+```{r}
+nc1 = st_transform(nc, 2264) # NC state plain, US feet
+pt1 = st_transform(st_sfc(pt, crs = st_crs(nc)), 2264)
+i1 = st_intersection(nc1["CNTY_"], pt1)
+```
+
+### Exercises
+
+1. start R, install package `sf` if not already present, and load it
+2. load the `nc` sample dataset as done above
+3. use `st_intersects` to discover which counties in `nc` intersect with county `Rowan`; experiment with the order of arguments to `st_intersects`
+4. try to understand the object returned by `st_intersects`
+5. look up which methods are available for objects of class `sgbp` (`methods(class = "sgbp")`), and try some of them
+6. does `Rowan` intersect with itself? 
+7. Find all counties that touch `Rowan` by using `st_touches`; does `Rowan` touch itself?
+8. How can we find what `intersects` and `touches` mean, more formally?
+
+## Raster data, temporal data
+
+### stars: time, raster, data cubes (15')
+
+## Data cubes, large rasters
+
+
+### time
+```{r}
+xts::.parseISO8601("2002-03")
+```
+### spatial time series
+### raster data
+### raster stacks
+### O-D matrices
+
+## stars: out-of-memory (5')
+
+## geostatistics with sf and stars (10')
+
+## intro to exercises (5')
+
+## References
