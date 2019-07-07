@@ -19,11 +19,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Part I (90')
 
-* Spatial data, simple features (20' + 10' exercises)
-* Raster data, temporal data (20' + 10' exercises)
-* Raster/vector data cubes, large rasters (20' + 10' exercises)
+* A. Spatial data, simple features (20' + 10' exercises)
+* B. Temporal data, raster data (20' + 10' exercises)
+* C. Raster/vector data cubes, large rasters (20' + 10' exercises)
 
-## Spatial data and simple features
+## A. Spatial data and simple features
 
 Since data collections can only be done _somewhere_, and at _some
 time_, all data is, in principle spatial and temporal. In many cases
@@ -190,6 +190,21 @@ pt1 = st_transform(st_sfc(pt, crs = st_crs(nc)), 2264)
 i1 = st_intersection(nc1["CNTY_"], pt1)
 ```
 
+We can plot two variable, for instance using base plot 
+
+```{r}
+plot(nc[c("SID74", "SID79")], key.pos = 4)
+```
+
+or `ggplot`:
+
+```{r}
+nc %>% select(SID74, SID79) %>% gather(VAR, SID, -geom) -> nc2 # stack two columns
+ggplot() + geom_sf(data = nc2, aes(fill = SID)) + facet_wrap(~VAR, ncol = 1) +
+  scale_y_continuous(breaks = 34:36) +
+  scale_fill_gradientn(colors = sf.colors(12)) 
+```
+
 ### Exercises
 
 1. start R, install package `sf` if not already present, and load it
@@ -201,26 +216,172 @@ i1 = st_intersection(nc1["CNTY_"], pt1)
 7. Find all counties that touch `Rowan` by using `st_touches`; does `Rowan` touch itself?
 8. How can we find what `intersects` and `touches` mean, more formally?
 
-## Raster data, temporal data
 
-### stars: time, raster, data cubes (15')
+## B. Temporal data, raster data (20' + 10' exercises)
 
-## Data cubes, large rasters
+### Time in R
 
+Base R has two time classes:
+```{r}
+(dt = Sys.Date())
+class(dt)
+(tm = Sys.time())
+class(tm)
+```
+where `Date` has (integer) numbers representing the day number, and
+`POSIXct` has (double, decimal) seconds, both counting since Jan 1,
+1970, 00:00 UTC. 
 
+### Time series data
+
+Packages `zoo` and `xts` provide classes for working with matrices
+of data, with a time index for each row.  The more recent package
+`tsibble` does something similar, extending `tibbles` rather than
+`matrix`.
+
+We will use a small piece of the `air` dataset in `spacetime`:
+```{r}
+data(air, package = "spacetime") # requires spacetime to be installed
+sel = 1800:2300
+library(xts)
+a.xts = xts(t(air)[sel,], order.by = dates[sel])
+```
+
+`xts` has the ability to intrepret
+[ISO-8601](https://en.wikipedia.org/wiki/ISO_8601) strings as time
+intervals, 
 ### time
 ```{r}
 xts::.parseISO8601("2002-03")
 ```
+
+and they can be used for time selection; we can select the first six
+months of 2003 (rows) and the first four stations (columns), using
+
+```{r}
+plot(a.xts["2003-01/2003-06",1:4], main = "PM10, four rural background stations, DE")
+```
+
+Neither `xts`, nor (to my knowledge) other R packages for time
+series data, keep an explicit record of the time _periods_ for which
+individual records are valid. The PM10 data examined here e.g. are
+daily averages, but a single time stamp (for daily data the start
+of the day, by convention) is registered for each observation.
+
+The data considered here form a kind of a space-time raster, as
+shown by
+```{r}
+image(dates[sel], 1:70, as.matrix(a.xts), ylab = "station")
+```
+
+### Raster data
+
+Raster data represent a 2-D matrix, where dimensions (rows/cols)
+map uniquely into coordinates.
+
+In the simplest case of a 
+
+- **regular raster** 
+    - $c(i) = o + (i-1) \times \delta, \ \ i = 1,2,...,n$
+    - $o$ is the border or the raster, $\delta$ the cell size
+    - for x, $\delta$ is usually positive, for y, negative (and $o$ the top edge)
+    - index space is continuous: integer $i$ implies $[i,i+1)$
+    - every coordinate value maps to a unique index (unlike polygon coverages, where boundaries are ambiguous)
+
+More complex rasters are
+
+- **rotated raster** 
+    - column and row dimensions are not alined with x and y axis
+
+- **sheared raster** 
+     - column and row dimensions are no longer perpendicular
+
+- **rectilinear raster** 
+     - increments along column and row dimension are not constant
+
+- **curvilinear raster** 
+     - every col/row combination has its own x and y value (or corner values)
+
+```{r echo=FALSE}
+suppressPackageStartupMessages(library(stars))
+suppressPackageStartupMessages(library(ggplot2))
+x = 1:5
+y = 1:4
+d = st_dimensions(x = x, y = y, .raster = c("x", "y"))
+m = matrix(runif(20),5,4)
+r1 = st_as_stars(r = m, dimensions = d)
+
+r = attr(d, "raster")
+r$affine = c(0.2, -0.2)
+attr(d, "raster") = r
+r2 = st_as_stars(r = m, dimensions = d)
+
+r = attr(d, "raster")
+r$affine = c(0.1, -0.3)
+attr(d, "raster") = r
+r3 = st_as_stars(r = m, dimensions = d)
+
+x = c(1, 2, 3.5, 5, 6)
+y = c(1, 1.5, 3, 3.5)
+d = st_dimensions(x = x, y = y, .raster = c("x", "y"))
+r4 = st_as_stars(r = m, dimensions = d)
+
+grd = st_make_grid(cellsize = c(10,10), offset = c(-130,10), n= c(8,5), crs=st_crs(4326))
+r5 = st_transform(grd, "+proj=laea +lon_0=-70 +lat_0=35")
+
+par(mfrow = c(2,3))
+r1 = st_make_grid(cellsize = c(1,1), n = c(5,4), offset = c(0,0))
+plot(r1, main = "regular")
+plot(st_geometry(st_as_sf(r2)), main = "rotated")
+plot(st_geometry(st_as_sf(r3)), main = "sheared")
+plot(st_geometry(st_as_sf(r4, as_points = FALSE)), main = "rectilinear")
+plot(st_geometry((r5)), main = "curvilinear")
+```
+
+### Analysing raster data
+
+Package [`raster`](https://rspatial.org/raster/index.html) has
+been around for a long time, is robust, well tested, versatile,
+and works for large rasters. We will not discuss it here.
+
+The more recent [`stars`](https://r-spatial.github.io/stars/)
+package has a different take on raster data, and will be used here.
+The following example loads 6 bands from a (section of a) Landsat
+7 image, and plots it:
+```{r}
+library(stars) # will load sf
+tif = system.file("tif/L7_ETMs.tif", package = "stars")
+x = read_stars(tif)
+plot(x)
+```
+The irregular color breaks come from the default of using "type =
+quantile" to `classInt::classIntervals()`, which causes [histogram
+stretching](https://en.wikipedia.org/wiki/Histogram_equalization);
+this is done over all 6 bands.
+
+### Exercises
+
+1. Start R, install package `stars` (if not already present), and load it
+2. load the Landsat image test set, as above
+3. Create an RGB composite plot using argument `rgb = c(3,2,1)` for RGB, and `rgb = c(4,3,2)` for false color.
+4. Use `x6 = split(x, "band")` to create a 2-dimensional raster with 6 attributes
+5. Plot `x6`. What has changed?
+6. Compute the mean of all six bands by adding all six attributes and dividing by 6, and assigning the resulting matrix as a new attribute in `x6`
+7. As an alternative, compute the mean of all six bands by applying function `mean` over the `x` and `y` dimensions (essentially reducing "band"), by using `st_apply`; compare the results of the two approaches
+
+## C. Raster/vector data cubes, large rasters (20' + 10' exercises)
+
+### stars: time, raster, data cubes (15')
+
 ### spatial time series
 ### raster data
 ### raster stacks
 ### O-D matrices
 
-## stars: out-of-memory (5')
+### stars: out-of-memory (5')
 
-## geostatistics with sf and stars (10')
+### geostatistics with sf and stars (10')
 
-## intro to exercises (5')
+### Exercises
 
 ## References
