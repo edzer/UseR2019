@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-user_edzer = Sys.getenv("USER") == "edzer" # set this to TRUE if you want to do the big data example with pkg starsdata
+have_starsdata = require("starsdata") # TRUE to do the big data example with pkg starsdata; instructions for installing below
 ```
 
 ## Part I (90')
@@ -375,13 +375,13 @@ install.packages("starsdata", repos = "https://cran.uni-muenster.de/pebesma" , t
 library(starsdata)
 ```
 
-```{r echo=FALSE,eval=user_edzer}
+```{r echo=FALSE,eval=have_starsdata}
 library(starsdata)
 ```
 
 We will read in the four 10-m resolution bands:
 
-```{r eval=user_edzer}
+```{r eval=have_starsdata}
 granule = system.file("sentinel/S2A_MSIL1C_20180220T105051_N0206_R051_T32ULE_20180221T134037.zip", package = "starsdata")
 base_name = strsplit(basename(granule), ".zip")[[1]]
 s2 = paste0("SENTINEL2_L1C:/vsizip/", granule, "/", base_name, ".SAFE/MTD_MSIL1C.xml:10m:EPSG_32632")
@@ -391,7 +391,7 @@ object.size(p)
 
 As we can see, this object contains no data, but only a pointer to the data. Plotting it,
 
-```{r eval=user_edzer}
+```{r eval=have_starsdata}
 system.time(plot(p))
 ```
 
@@ -401,7 +401,7 @@ than 10 minutes.
 
 We can compute an index like [ndvi](https://en.wikipedia.org/wiki/Normalized_difference_vegetation_index), and plot it:
 
-```{r eval=user_edzer}
+```{r eval=have_starsdata}
 ndvi = function(x) (x[4] - x[1])/(x[4] + x[1])
 rm(x)
 (s2.ndvi = st_apply(p, c("x", "y"), ndvi))
@@ -457,6 +457,11 @@ st_crs(a.st2)
 ```
 
 ### geostatistics with sf and stars (10')
+
+For the following to run well, we need `stars` (>= 0.3-2) installed from github:
+```{r eval=FALSE}
+remotes::install_github("r-spatial/stars")
+```
 
 We can interpolate these spatial time series, when we have a target grid, e.g.
 created by
