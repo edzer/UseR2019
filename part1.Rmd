@@ -17,6 +17,10 @@ link-citations: yes
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+user_edzer = Sys.getenv("USER") == "edzer" # set this to TRUE if you want to do the big data example with pkg starsdata
+```
+
 ## Part I (90')
 
 * A. Spatial data, simple features (20' + 10' exercises)
@@ -371,13 +375,13 @@ install.packages("starsdata", repos = "https://cran.uni-muenster.de/pebesma" , t
 library(starsdata)
 ```
 
-```{r echo=FALSE,eval=TRUE}
+```{r echo=FALSE,eval=user_edzer}
 library(starsdata)
 ```
 
 We will read in the four 10-m resolution bands:
 
-```{r}
+```{r eval=user_edzer}
 granule = system.file("sentinel/S2A_MSIL1C_20180220T105051_N0206_R051_T32ULE_20180221T134037.zip", package = "starsdata")
 base_name = strsplit(basename(granule), ".zip")[[1]]
 s2 = paste0("SENTINEL2_L1C:/vsizip/", granule, "/", base_name, ".SAFE/MTD_MSIL1C.xml:10m:EPSG_32632")
@@ -387,7 +391,7 @@ object.size(p)
 
 As we can see, this object contains no data, but only a pointer to the data. Plotting it,
 
-```{r}
+```{r eval=user_edzer}
 system.time(plot(p))
 ```
 
@@ -397,7 +401,7 @@ than 10 minutes.
 
 We can compute an index like [ndvi](https://en.wikipedia.org/wiki/Normalized_difference_vegetation_index), and plot it:
 
-```{r}
+```{r eval=user_edzer}
 ndvi = function(x) (x[4] - x[1])/(x[4] + x[1])
 rm(x)
 (s2.ndvi = st_apply(p, c("x", "y"), ndvi))
@@ -464,33 +468,28 @@ grd[[1]][grd[[1]] == 0] = NA
 plot(grd, axes = TRUE)
 ```
 
-We will simply pick a variogram model, without properly fitting it to sample space/time sample variograms:
+We will work with temporal means, rather than full space/time variability, and fit
+a variogram to the temporal mean PM10 values:
 ```{r}
 library(gstat)
-model <- vgmST("productSum",
-    space=vgm(150, "Exp", 5000, 0),
-    time= vgm(20, "Sph",    10, 0),
-    k=2)
+st_apply(a.st2, "sfc", mean, na.rm = TRUE) %>% 
+	st_as_sf() %>%
+	na.omit()  -> a.means
+v = variogram(mean ~ 1, a.means)
+v.fit = fit.variogram(v, vgm(10, "Exp", 1e5, 10))
+plot(v, v.fit)
 ```
 
+Then, we can use this for kriging:
 ```{r}
-t4 = dates[sel][1:12]
-d = dim(grd)
-st_as_stars(pts = array(1, c(d[1], d[2], time=length(t4)))) %>%
-    st_set_dimensions("time", t4) %>%
-    st_set_dimensions("x", st_get_dimension_values(grd, "x")) %>%
-    st_set_dimensions("y", st_get_dimension_values(grd, "y")) %>%
-    st_set_crs(crs) -> grd.st
-new_int <- krigeST(PM10~1, data = a.st2, newdata = grd.st,
-         nmax = 50, stAni = 1000, modelList = model,
-         progress = FALSE)
-plot(new_int[2,,,1], reset = FALSE)
+int <- krige(mean~1, a.means, grd, v.fit)
+plot(int, reset = FALSE, key.pos = 4, breaks = "pretty")
 plot(de, col = NA, border = 'red', add = TRUE)
-plot(st_geometry(no2.sf), col = 'green', add = TRUE, pch = 16)
+plot(st_geometry(a.means), col = 'green', add = TRUE, pch = 16)
 ```
 
-A more worked out case study on this type of data is found in the geostatistics/interpolation chapter
-of [@sdsr].
+A further worked out space/time case study on this type of data is
+found in the geostatistics/interpolation chapter of [@sdsr].
 
 ### stars: time, raster, data cubes (15')
 
