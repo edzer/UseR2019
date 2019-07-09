@@ -101,12 +101,15 @@ variable we have support the _size of the area aggreated over_.
 
 ### intro to `sf`
 
-`sf` uses the OSGEO stack of software:
+Although not needed for working with `sf`, we'll be using tidyverse.
 ```{r}
 library(tidyverse) # although not needed for working with sf!
+```
+`sf` uses the OSGEO stack of software:
+```{r}
 library(sf)
 ```
-
+Internal (R) and system dependencies look like this:
 ```{r echo=FALSE}
 knitr::include_graphics('sf_deps.png')
 ```
@@ -466,7 +469,7 @@ $$(D_1,D_2,...,D_n)\rightarrow (A_1,A_2,...,A_p)$$
         - frequency or wavelength, 
         - duration (e.g., time-to-forecast)
 
-## "Cube": 
+### "Cube": 
 
 We use the word _cube_ short for
 
@@ -478,7 +481,7 @@ a special case is:
 
 - one dimensional cube: table with records (`data.frame`, `tibble`)
 
-## "Spatial" data cube
+### "Spatial" data cube
 
 Cube dimensions can refer to spatial dimensions in several ways:
 
@@ -652,7 +655,7 @@ remotes::install_github("r-spatial/stars")
 4. Using the precipitation grid data shown above, find the time series with for each county in North Carolina the _maximum_ precipitation, and plot this. Note that
     - `nc` has a different datum from `prec`, use `st_transform` for datum transformation
 	- the time values should be hourly, but may come out differently
-5. read in the file `system.file("nc/tos_O1_2001-2002.nc", package = "stars")
+5. read in the file `system.file("nc/tos_O1_2001-2002.nc", package = "stars")`
 6. what is the bounding box of this data set? What is the CRS, and the temporal reference system?
 7. obtain the temperature time series of this dataset at point `POINT(200 10)`, using `pt = st_sfc(st_point(c(200, 10)))`
 
