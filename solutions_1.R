@@ -99,12 +99,18 @@ st_rasterize(nc["SID74"], st_as_stars(st_bbox(nc), nx = 30, ny = 60, values = NA
 #   - `nc` has a different datum from `prec`, use `st_transform` for datum transformation
 #   - the time values should be hourly, but may come out differently
 
+prec_file = system.file("nc/test_stageiv_xyt.nc", package = "stars")
+prec = read_ncdf(prec_file, curvilinear = c("lon", "lat"))
+library(dplyr) # loads slice generic
+prec_slice = slice(prec, index = 17, along = "time")
 a = aggregate(prec, st_transform(nc, st_crs(prec_slice)), max)
 plot(a, max.plot = 23)
 
 # 5. read in the file `system.file("nc/tos_O1_2001-2002.nc", package = "stars")
 
 r = read_stars(system.file("nc/tos_O1_2001-2002.nc", package = "stars"))
+r[[1]] = units::drop_units(r[[1]])
+plot(r)
 
 # 6. what is the bounding box of this data set? What is the CRS, and the temporal reference system?
 

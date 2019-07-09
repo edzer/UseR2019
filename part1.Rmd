@@ -655,7 +655,8 @@ remotes::install_github("r-spatial/stars")
 4. Using the precipitation grid data shown above, find the time series with for each county in North Carolina the _maximum_ precipitation, and plot this. Note that
     - `nc` has a different datum from `prec`, use `st_transform` for datum transformation
 	- the time values should be hourly, but may come out differently
-5. read in the file `system.file("nc/tos_O1_2001-2002.nc", package = "stars")`
+5. read in the file `system.file("nc/tos_O1_2001-2002.nc", package = "stars")` as `r`
+    - before plotting it, replace the array remove the units using `r[[1]] = units::drop_units(r[[1]])`
 6. what is the bounding box of this data set? What is the CRS, and the temporal reference system?
 7. obtain the temperature time series of this dataset at point `POINT(200 10)`, using `pt = st_sfc(st_point(c(200, 10)))`
 
