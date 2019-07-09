@@ -73,3 +73,51 @@ x6$mean = (x6[[1]] + x6[[2]] + x6[[3]] + x6[[4]] + x6[[5]] + x6[[6]])/6
 
 xm = st_apply(x, c("x", "y"), mean)
 all.equal(xm[[1]], x6$mean)
+
+## C:
+# 1. rasterize the `nc` dataset above, using `st_rasterize`. 
+
+# Which attribute is retained? How could you do this for another attribute?
+
+st_rasterize(nc)
+
+# Which attribute is retained? 
+
+# AREA (the first)
+
+# How could you do this for another attribute?
+
+# name the argument:
+st_rasterize(nc["SID74"])
+
+# 2. Modify the rasterization such that you get 30 rows and 60 columns (hint: look at the exercises help of `?st_rasterize`)
+
+st_rasterize(nc["SID74"], st_as_stars(st_bbox(nc), nx = 30, ny = 60, values = NA_real_))
+
+# 3. Look up what `st_crop` does, and run its examples.
+# 4. Using the precipitation grid data shown above, find the time series with for each county in North Carolina the _maximum_ precipitation, and plot this. Note that
+#   - `nc` has a different datum from `prec`, use `st_transform` for datum transformation
+#   - the time values should be hourly, but may come out differently
+
+a = aggregate(prec, st_transform(nc, st_crs(prec_slice)), max)
+plot(a, max.plot = 23)
+
+# 5. read in the file `system.file("nc/tos_O1_2001-2002.nc", package = "stars")
+
+r = read_stars(system.file("nc/tos_O1_2001-2002.nc", package = "stars"))
+
+# 6. what is the bounding box of this data set? What is the CRS, and the temporal reference system?
+
+st_bbox(r)
+st_crs(r)
+
+# time reference: PCICt 360-day calendar
+
+# 7. obtain the temperature time series of this dataset at point `POINT(200 10)`, using `pt = st_sfc(st_point(c(200, 10)))`
+
+pt = st_point(c(200, 10))
+r[st_sfc(pt)]
+
+# or 
+
+aggregate(r, st_sfc(pt), identity)

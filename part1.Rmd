@@ -452,6 +452,70 @@ st_bbox(a.st2)
 st_crs(a.st2)
 ```
 
+### vector and raster data cubes: what are they?
+
+- They are annotated **array data**.
+- Arrays map from $n$ dimensions to $p$ attributes:
+$$(D_1,D_2,...,D_n)\rightarrow (A_1,A_2,...,A_p)$$
+- array dimensions are enumerated sets, and may
+    - represent a set of entities (cities, persons, species, spectral bands)
+    - discretize a continuous variable, such as 
+        - spatial _dimension_, 
+        - time, 
+        - time-of-day, 
+        - frequency or wavelength, 
+        - duration (e.g., time-to-forecast)
+
+## "Cube": 
+
+We use the word _cube_ short for
+
+- "real" cube: three dimensions
+- more than three dimensions: hypercube
+- two dimensions: matrix, raster
+
+a special case is:
+
+- one dimensional cube: table with records (`data.frame`, `tibble`)
+
+## "Spatial" data cube
+
+Cube dimensions can refer to spatial dimensions in several ways:
+
+- each continuous spatial dimension (x, y, z) maps to a **single** cube dimension (**raster** data cubes), e.g. regular grids
+   - $c(i) = o + (i-1) \times \delta, \ \ i = 1,2,...,n$
+   - index space is continuous: integer $i$ implies $[i,i+1)$
+   - this means that every coordinate value maps to a unique index (unlike polygons)
+
+- **all** spatial dimensions map to a single cube dimension (**vector** data cubes)
+    - cube dimension is a set of points/lines/polygons
+    
+- combinations of these: e.g. origin-destination matrices
+
+----
+
+```{r,out.width='100%'}
+knitr::include_graphics('cube1.png')
+```
+
+----
+
+```{r,out.width='100%'}
+knitr::include_graphics('cube2.png')
+```
+
+----
+
+```{r,out.width='100%'}
+knitr::include_graphics('cube3.png')
+```
+
+----
+
+```{r,out.width='100%'}
+knitr::include_graphics('cube4.png')
+```
+
 ### geostatistics with sf and stars (10')
 
 For the following to run well, we need `stars` (>= 0.3-2) installed from github:
@@ -508,26 +572,33 @@ found in the geostatistics/interpolation chapter of [@sdsr].
 
 ### time series rasters
 
-```{r}
-system.file("nc/bcsd_obs_1999.nc", package = "stars") %>%
-    read_ncdf() -> bcsd
-g + geom_stars(data = bcsd[1]) + facet_wrap("time")
+```{r eval=have_starsdata}
+x = c(
+"avhrr-only-v2.19810901.nc",
+"avhrr-only-v2.19810902.nc",
+"avhrr-only-v2.19810903.nc",
+"avhrr-only-v2.19810904.nc",
+"avhrr-only-v2.19810905.nc",
+"avhrr-only-v2.19810906.nc",
+"avhrr-only-v2.19810907.nc",
+"avhrr-only-v2.19810908.nc",
+"avhrr-only-v2.19810909.nc"
+)
+# see the second vignette:
+# install.packages("starsdata", repos = "http://pebesma.staff.ifgi.de", type = "source")
+file_list = system.file(paste0("netcdf/", x), package = "starsdata")
+(y = read_stars(file_list, quiet = TRUE))
+library(abind)
+z <- y %>% select(sst) %>% adrop()
+# g + geom_stars(data = z[1], alpha = 0.8) + facet_wrap("time")
+z$sst = units::drop_units(z$sst) # otherwise, titles are messed up (issue)
+plot(z)
 ```
 
 ### Transforming rasters
 
 With such a grid, and any other grid, `st_transform` simply creates
 a new curvilinear grid:
-
-```{r}
-(nc_state_plane = st_crs(2264))
-prec_slice %>% 
-  st_transform(nc_state_plane) %>% 
-  plot(border = NA, breaks = breaks, reset = FALSE)
-nc %>%
-  st_transform(nc_state_plane) %>% 
-  plot(add = TRUE, reset = FALSE, col = NA, border = 'red')
-```
 
 We can _warp_ a **regular** grid to be a new **regular** grid in the
 existing, or to a default grid in a new target CRS, e.g. by
@@ -569,5 +640,20 @@ polygons) by extrapolating grid cell centeres. This will not (yet)
 work with grid crossing dateline or poles.
 
 ### Exercises
+
+For the exercises, it may be good to use a version of `stars` not yet on CRAN, installed by:
+```{r eval=FALSE}
+remotes::install_github("r-spatial/stars")
+```
+
+1. rasterize the `nc` dataset above, using `st_rasterize`. Which attribute is retained? How could you do this for another attribute?
+2. Modify the rasterization such that you get 30 rows and 60 columns (hint: look at the exercises help of `?st_rasterize`)
+3. Look up what `st_crop` does, and run its examples.
+4. Using the precipitation grid data shown above, find the time series with for each county in North Carolina the _maximum_ precipitation, and plot this. Note that
+    - `nc` has a different datum from `prec`, use `st_transform` for datum transformation
+	- the time values should be hourly, but may come out differently
+5. read in the file `system.file("nc/tos_O1_2001-2002.nc", package = "stars")
+6. what is the bounding box of this data set? What is the CRS, and the temporal reference system?
+7. obtain the temperature time series of this dataset at point `POINT(200 10)`, using `pt = st_sfc(st_point(c(200, 10)))`
 
 ## References
