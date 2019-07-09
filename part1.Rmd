@@ -13,6 +13,10 @@ bibliography: useR19_I.bib
 link-citations: yes
 ---
 
+### Copyright
+
+All the material presented here, to the extent it is original, is available under [CC-BY-SA](https://creativecommons.org/licenses/by-sa/2.0/).
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
