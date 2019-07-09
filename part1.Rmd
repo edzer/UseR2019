@@ -370,7 +370,7 @@ today: 10 m resolution, 5 days intervals. A sample image is provided
 in the (off-CRAN) 1 Gb `starsdata` package:
 
 ```{r eval=FALSE}
-install.packages("starsdata", repos = "https://cran.uni-muenster.de/pebesma" , type = "source")
+install.packages("starsdata", repos = "http://gis-bigdata.uni-muenster.de/pebesma" , type = "source")
 library(starsdata)
 ```
 
