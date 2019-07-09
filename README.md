@@ -18,11 +18,10 @@ and the tidyverse will be helpful for taking this tutorial.
 
 Workshop program:
 
-* 14:00-15:15: Introduction, spatial, spatio-temporal data, data cubes (Edzer); [slides](https://edzer.github.io/UseR2019/part1.html)
-* 15:15-16:00: Exercises (and break) with help from Angela, Edzer, Roger (break: 15:30-16:00)
-* 16:00-16:15: Recap of the exercises
-* 16:15-17:30: Spatial modelling, spatial weights, spatial regression (Roger);
-[slides](https://edzer.github.io/UseR2019/part2.html)
+* 14:00-15:30: Introduction, spatial, spatio-temporal data, data cubes (Edzer) + exercises; [materials](https://edzer.github.io/UseR2019/part1.html), [solutions for exercises](https://github.com/edzer/UseR2019/blob/master/solutions_1.R)
+* 15:30-16:00: Break and time for questions
+* 16:00-17:30: Spatial modelling, spatial weights, spatial regression + exercises (Roger);
+[materials](https://edzer.github.io/UseR2019/part2.html)
 
 Potentially useful materials for preparing:
 
@@ -34,5 +33,4 @@ Potentially useful materials for preparing:
 * [Paris workshop slides](https://github.com/rsbivand/sew19)
 
 Datasets that will be used:
-
 
